@@ -5,7 +5,22 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
+from prometheus_client import start_http_server, Gauge
+import time
 
+
+mse_gauge = Gauge(
+    "model_mse",
+    "Mean Squared Error of models",
+    ["model_name"]
+)
+
+# ⭐ ADD THIS BLOCK
+for name in ["LinearRegression", "RandomForest", "GradientBoosting"]:
+    mse_gauge.labels(model_name=name).set(0)
+
+start_http_server(8000)
+print("Prometheus metrics available at http://localhost:8000/metrics")
 
 mlflow.set_tracking_uri("http://127.0.0.1:5000")
 mlflow.set_experiment("Diabetes_Regression_Comparison")
@@ -29,6 +44,7 @@ models = {
 best_mse = float("inf")
 best_run_id = None
 best_model_name = None
+
 
 
 for model_name, model in models.items():
@@ -60,7 +76,8 @@ for model_name, model in models.items():
             best_mse = mse
             best_run_id = mlflow.active_run().info.run_id
             best_model_name = model_name
-
+            
+        mse_gauge.labels(model_name=model_name).set(mse)
 
 # Register BEST model automatically
 
@@ -74,3 +91,7 @@ print(f"Best Model: {best_model_name}")
 print(f"Best MSE: {best_mse:.4f}")
 print(f"Registered as: {registered_model_name}")
 print("\nOpen MLflow UI at http://127.0.0.1:5000")
+
+print("Training finished. Keeping server alive for Prometheus scrape...")
+while True:
+    time.sleep(5)
